@@ -1,0 +1,23 @@
+[
+  {
+    "id": "demo-recurring",
+    "label": "1. Recurring Outage (pgbouncer pool)",
+    "type": "Recurring",
+    "service": "ledger-db",
+    "alert_text": "FATAL: sorry, too many clients already\n[ERROR] pgbouncer pool exhaustion on db-primary-01.kirana.internal:6432. Active server connections: 200/200, queued clients: 92. Occurred 20 minutes after payments-worker v2.7.0 release deploy."
+  },
+  {
+    "id": "demo-partial",
+    "label": "2. Partial Match (Kafka Consumer Lag)",
+    "type": "Partial match",
+    "service": "search-indexer",
+    "alert_text": "[ALERT] KafkaConsumerLagHigh: consumer_group=search-indexer-prod, topic=catalog-updates, lag=380,000 messages. Partition rebalance initiated after broker restart."
+  },
+  {
+    "id": "demo-novel",
+    "label": "3. Novel Incident (S3 Signature Mismatch)",
+    "type": "Novel",
+    "service": "notifications-svc",
+    "alert_text": "AWS S3 Error: The request signature we calculated does not match the signature you provided. Check your key and signing method.\n[ERROR] S3 presigned URL generation failed on node-worker-12. Time drift detected (+320s offset)."
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "RULE-01",
+    "title": "Peak Hours Triage Protocol",
+    "content": "During peak operational hours (7pm–11pm IST), the Kirana Cloud on-call team MUST always roll back recent deployments first and perform root-cause analysis later. Speed of recovery takes precedence over diagnosing live bug state."
+  },
+  {
+    "id": "RULE-02",
+    "title": "Ledger Database Safeguard",
+    "content": "Never restart the ledger-db primary or execute failovers without explicitly paging Priya Raman (Database Owner) first, regardless of severity level."
+  },
+  {
+    "id": "RULE-03",
+    "title": "Payment Incident Status Page SLA",
+    "content": "Payment worker or UPI settlement incidents lasting longer than 10 minutes require an immediate external status page update (status.kiranacloud.in) within 15 minutes."
+  },
+  {
+    "id": "RULE-04",
+    "title": "Redis Memory Incident Action",
+    "content": "When dealing with Redis maxmemory or key eviction on checkout-api, NEVER perform a full FLUSHALL command. Always run targeted pattern-based expiration scripts to preserve live customer carts."
+  },
+  {
+    "id": "RULE-05",
+    "title": "Kafka Consumer Lag Scaling Rule",
+    "content": "Do NOT scale out search-indexer pods during active Kafka rebalance storms. Scaling out dynamic consumers triggers additional rebalance loops. Ensure group.instance.id is pinned."
+  },
+  {
+    "id": "RULE-06",
+    "title": "UPI Retry Feature Flag Safety",
+    "content": "Before enabling any payment retry or UPI workflow feature flags, verify idempotency headers on payment callbacks and consult Arjun Mehta (Payments Tech Lead)."
+  }
+]

@@ -1,0 +1,335 @@
+[
+  {
+    "id": "INC-2104",
+    "title": "pgbouncer pool exhaustion on ledger-db post v2.4 deploy",
+    "service": "ledger-db",
+    "severity": "SEV1",
+    "started_at": "2026-07-20T14:15:00Z",
+    "duration_minutes": 45,
+    "alert_text": "FATAL: sorry, too many clients already\n[ERROR] pgbouncer pool exhaustion on db-primary-01.kirana.internal:6432. Active server connections: 200/200, queued clients: 84. Host: payments-worker-7d9b-x92zk.",
+    "symptoms": "UPI settlement payouts failing with database connection timeouts; API latency spiked to 12.4s.",
+    "root_cause": "payments-worker concurrency raised from 16 to 64 in v2.4 release without scaling pgbouncer default_pool_size (was 25). Each worker worker thread exhausted pool slots.",
+    "resolution_steps": [
+      "Lowered PAYMENTS_WORKER_CONCURRENCY env var back to 16 in deployment manifest",
+      "Increased pgbouncer default_pool_size from 25 to 50 in pgbouncer.ini",
+      "Reloaded pgbouncer config: systemctl reload pgbouncer"
+    ],
+    "what_did_not_work": "Restarting payments-worker pods temporarily cleared connections but pool filled up again within ~10 minutes.",
+    "resolved_by": "Priya Raman",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2104"
+  },
+  {
+    "id": "INC-2148",
+    "title": "pgbouncer pool exhaustion on ledger-db during high sale traffic",
+    "service": "ledger-db",
+    "severity": "SEV1",
+    "started_at": "2026-08-05T19:30:00Z",
+    "duration_minutes": 35,
+    "alert_text": "FATAL: remaining connection slots are reserved for non-replication superuser connections\n[CRITICAL] db-primary-02.kirana.internal reached max_connections limit. Client count: 350. Source: payments-worker pods.",
+    "symptoms": "Merchant payout batches failing across North India region; 500 errors on /api/v1/ledger/balance.",
+    "root_cause": "Unannounced deployment of payments-worker autoscaling rule (hpa maxReplicas 50) flooded pgbouncer pool limits during flash sale.",
+    "resolution_steps": [
+      "Capped payments-worker hpa maxReplicas to 20",
+      "Set PAYMENTS_WORKER_CONCURRENCY to 12 per pod",
+      "Adjusted pgbouncer max_client_conn to 1000 and default_pool_size to 60"
+    ],
+    "what_did_not_work": "Pod restarts provided temporary relief for 8-10 minutes before connection pool choked again.",
+    "resolved_by": "Priya Raman",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2148"
+  },
+  {
+    "id": "INC-2231",
+    "title": "pgbouncer connection choke on ledger-db after async retry rollout",
+    "service": "ledger-db",
+    "severity": "SEV1",
+    "started_at": "2026-08-28T10:10:00Z",
+    "duration_minutes": 50,
+    "alert_text": "FATAL: sorry, too many clients already\n[ERROR] pgbouncer pool max pool_size reached for database 'kirana_ledger'. active_clients=200 waiting_clients=142. Host: ledger-db-replica-01.",
+    "symptoms": "Double-entry ledger validation failing, payments worker crashing with DB timeout exceptions.",
+    "root_cause": "Async retry queue rollout spawned additional DB connection per retry worker, breaching pgbouncer client limits.",
+    "resolution_steps": [
+      "Decreased PAYMENTS_WORKER_CONCURRENCY from 32 to 16",
+      "Increased pgbouncer default_pool_size from 50 to 80 in pgbouncer.ini",
+      "Applied pool connection recycling lifetime max_age = 1800"
+    ],
+    "what_did_not_work": "Bouncing pgbouncer and payments-worker pods only relieved pressure for ~10 minutes.",
+    "resolved_by": "Arjun Mehta",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2231"
+  },
+  {
+    "id": "INC-2115",
+    "title": "Redis maxmemory eviction storm on checkout-api",
+    "service": "checkout-api",
+    "severity": "SEV2",
+    "started_at": "2026-07-25T16:00:00Z",
+    "duration_minutes": 60,
+    "alert_text": "OOM command not allowed when used memory > 'maxmemory'\n[WARNING] redis-checkout-cluster node-3 memory usage 98.4%. Evicted 452,000 keys in 120s. Volatile-lru active.",
+    "symptoms": "User cart sessions logged out abruptly; checkout dropoff rate jumped 40%.",
+    "root_cause": "TTL config change set session TTL to 7 days instead of 2 hours, preventing normal key expiration and causing massive LRU eviction of active shopping carts.",
+    "resolution_steps": [
+      "Reverted session TTL back to 7200 seconds in checkout config",
+      "Flushed stale persistent cart keys using redis-cli SCAN script with pattern 'session:legacy:*'",
+      "Increased Redis maxmemory limit to 16GB"
+    ],
+    "what_did_not_work": "Flushing all Redis keys destroyed valid active customer checkouts.",
+    "resolved_by": "Sneha Kulkarni",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2115"
+  },
+  {
+    "id": "INC-2204",
+    "title": "Redis maxmemory eviction storm on checkout-api cart session cache",
+    "service": "checkout-api",
+    "severity": "SEV2",
+    "started_at": "2026-08-18T21:45:00Z",
+    "duration_minutes": 40,
+    "alert_text": "OOM command not allowed when used memory > 'maxmemory'\n[ERROR] redis-cart-primary: memory limit reached (12GB/12GB). Eviction rate 3200 keys/sec.",
+    "symptoms": "Checkout payload validation errors; empty cart reported by 15,000 active shoppers.",
+    "root_cause": "Cart recommendation metadata added to session payload without TTL override, bloating key sizes by 8x and triggering maxmemory eviction.",
+    "resolution_steps": [
+      "Disabled recommendation payload caching in checkout-api flag",
+      "Executed targeted EXPIRE script for high-size keys",
+      "Set explicit TTL of 3600 seconds on cart object payloads"
+    ],
+    "what_did_not_work": "Restarting Redis primary caused failover to replica which immediately hit memory ceiling.",
+    "resolved_by": "Sneha Kulkarni",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2204"
+  },
+  {
+    "id": "INC-2160",
+    "title": "Kafka consumer lag spike on search-indexer after partition rebalance",
+    "service": "search-indexer",
+    "severity": "SEV2",
+    "started_at": "2026-08-09T11:20:00Z",
+    "duration_minutes": 55,
+    "alert_text": "[ALERT] KafkaConsumerLagHigh: consumer_group=search-indexer-prod, topic=catalog-updates, lag=458,920 messages. Rebalance in progress for 1800s.",
+    "symptoms": "New products added by sellers not showing in store search results for over 1 hour.",
+    "root_cause": "Dynamic consumer group membership caused stop-the-world rebalance cascades whenever pod autoscaler added or terminated a search-indexer instance.",
+    "resolution_steps": [
+      "Configured static consumer group membership by pinning group.instance.id in indexer pod spec (e.g. group.instance.id=search-indexer-pod-1)",
+      "Increased session.timeout.ms from 10000 to 45000 in consumer config"
+    ],
+    "what_did_not_work": "Adding more search-indexer pods caused more rebalance loops and worsened consumer lag.",
+    "resolved_by": "Rohit Das",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2160"
+  },
+  {
+    "id": "INC-2245",
+    "title": "Kafka consumer group rebalance thrashing on search-indexer",
+    "service": "search-indexer",
+    "severity": "SEV2",
+    "started_at": "2026-09-02T08:15:00Z",
+    "duration_minutes": 40,
+    "alert_text": "[ALERT] KafkaConsumerLagHigh: consumer_group=search-indexer-prod, topic=inventory-events, lag=612,000 messages. Member revoked due to poll timeout.",
+    "symptoms": "Inventory update stream lagging; out-of-stock items listed as available on Kirana Cloud mobile app.",
+    "root_cause": "Heavy bulk catalog import batch exceeded max.poll.interval.ms (300000ms), causing broker to kick consumer and trigger rebalance loop.",
+    "resolution_steps": [
+      "Ensured static membership group.instance.id was correctly set on all search-indexer stateful pods",
+      "Increased max.poll.interval.ms to 900000ms and reduced max.poll.records to 250"
+    ],
+    "what_did_not_work": "Manually resetting offset to latest lost 50k inventory updates.",
+    "resolved_by": "Rohit Das",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2245"
+  },
+  {
+    "id": "INC-2180",
+    "title": "TLS certificate expiry on auth-gateway",
+    "service": "auth-gateway",
+    "severity": "SEV1",
+    "started_at": "2026-08-14T02:00:00Z",
+    "duration_minutes": 25,
+    "alert_text": "SSL: CERTIFICATE_VERIFY_FAILED certificate has expired\n[EMERGENCY] https://auth.kiranacloud.in SSL handshake failure. HTTP 525 Origin SSL Handshake Failed.",
+    "symptoms": "All user logins, token validations, and merchant authentication failing globally.",
+    "root_cause": "Cert-manager auto-renewal webhook failed silently due to an ingress controller API version mismatch during Kubernetes 1.28 cluster upgrade.",
+    "resolution_steps": [
+      "Manually provisioned and uploaded wildcard TLS cert via Let's Encrypt ACME DNS-01 challenge",
+      "Updated secret auth-gateway-tls in namespace prod-auth",
+      "Patched cert-manager deployment ClusterIssuer API endpoint"
+    ],
+    "what_did_not_work": "Bouncing ingress-nginx pods did not fix the expired certificate secret.",
+    "resolved_by": "Fatima Sheikh",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2180"
+  },
+  {
+    "id": "INC-2210",
+    "title": "Duplicate UPI payment callbacks caused by bad feature flag",
+    "service": "payments-worker",
+    "severity": "SEV1",
+    "started_at": "2026-08-21T15:30:00Z",
+    "duration_minutes": 30,
+    "alert_text": "DuplicateKeyException: UNIQUE constraint failed: ledger_entries.idempotency_key\n[CRITICAL] payments-worker processing duplicate webhook callback for txn_upi_9941029.",
+    "symptoms": "Merchants receiving double payout credits for single customer UPI payments; high ledger discrepancy alerts.",
+    "root_cause": "Feature flag 'new_upi_retry_flow' was enabled globally without checking bank gateway webhook idempotency headers, causing retry worker to process callback twice.",
+    "resolution_steps": [
+      "Immediately toggled OFF feature flag 'new_upi_retry_flow' in LaunchDarkly / internal flag engine",
+      "Ran ledger correction script fix_duplicate_upi_credits.py for affected transactions",
+      "Added strict redis idempotency check prior to database transaction start"
+    ],
+    "what_did_not_work": "Disabling payment gateway webhook endpoint blocked legitimate incoming payments.",
+    "resolved_by": "Arjun Mehta",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2210"
+  },
+  {
+    "id": "INC-2090",
+    "title": "Core DNS lookup failure in Kubernetes cluster",
+    "service": "auth-gateway",
+    "severity": "SEV2",
+    "started_at": "2026-07-16T09:05:00Z",
+    "duration_minutes": 20,
+    "alert_text": "getaddrinfo ENOTFOUND redis-auth.prod.svc.cluster.local\n[ERROR] auth-gateway unable to resolve internal microservice hostnames.",
+    "symptoms": "Inter-service RPC calls failing with 503 Service Unavailable across all web pods.",
+    "root_cause": "CoreDNS pods memory throttled after spike in single-label DNS queries from a misconfigured monitoring agent.",
+    "resolution_steps": [
+      "Increased CoreDNS deployment memory limit from 170Mi to 512Mi",
+      "Enabled CoreDNS autopath plugin to optimize cluster search domain lookups"
+    ],
+    "what_did_not_work": "Restarting node local DNS caches did not resolve upstream CoreDNS OOM kills.",
+    "resolved_by": "Fatima Sheikh",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2090"
+  },
+  {
+    "id": "INC-2125",
+    "title": "Disk full on notifications-svc log volume",
+    "service": "notifications-svc",
+    "severity": "SEV3",
+    "started_at": "2026-07-29T22:10:00Z",
+    "duration_minutes": 15,
+    "alert_text": "No space left on device: '/var/log/notifications/app.log'\n[WARN] node-worker-08 disk usage 100% on /dev/sda1.",
+    "symptoms": "WhatsApp and SMS transaction OTP notifications queued and failing to dispatch.",
+    "root_cause": "Debug level logging left enabled after WhatsApp API integration testing, producing 50GB of raw logs in 12 hours and filling host disk.",
+    "resolution_steps": [
+      "Truncated app.log files and cleared rotated logs",
+      "Set LOG_LEVEL=INFO in helm values for notifications-svc",
+      "Configured logrotate to retain max 5GB with daily rotation"
+    ],
+    "what_did_not_work": "Deleting active log file without truncating left file descriptor open, retaining disk space usage.",
+    "resolved_by": "Sneha Kulkarni",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2125"
+  },
+  {
+    "id": "INC-2135",
+    "title": "Third-party SMS Gateway (Gupshup) HTTP 504 timeouts",
+    "service": "notifications-svc",
+    "severity": "SEV2",
+    "started_at": "2026-08-01T12:00:00Z",
+    "duration_minutes": 50,
+    "alert_text": "HTTP 504 Gateway Timeout from vendor endpoint api.sms-provider.com/v1/send\n[ERROR] OTP dispatch failure rate 68%.",
+    "symptoms": "Customers unable to receive 2FA login OTPs for merchant dashboard.",
+    "root_cause": "Upstream telecom aggregator infrastructure degradation in Mumbai region causing SMS dispatch timeouts.",
+    "resolution_steps": [
+      "Switched active SMS provider route in notifications-svc config from Primary (Gupshup) to Fallback (Twilio/Kaleyra)",
+      "Notified SMS vendor support team"
+    ],
+    "what_did_not_work": "Retrying failed requests on primary provider escalated queue backpressure.",
+    "resolved_by": "Rohit Das",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2135"
+  },
+  {
+    "id": "INC-2172",
+    "title": "Elasticsearch JVM Heap Garbage Collection pause on search-indexer",
+    "service": "search-indexer",
+    "severity": "SEV2",
+    "started_at": "2026-08-11T17:40:00Z",
+    "duration_minutes": 30,
+    "alert_text": "[WARN] [o.e.m.j.JvmGcMonitorService] [es-node-02] gc [young] took [14.2s] which is longer than the threshold [500ms]",
+    "symptoms": "Search queries timing out on product catalog; 408 Request Timeout returned to mobile clients.",
+    "root_cause": "Unoptimized wildcard regex search query executed by bulk indexing script caused JVM heap allocation spike.",
+    "resolution_steps": [
+      "Killed long-running regex queries in Elasticsearch task manager",
+      "Restricted max_clause_count in search cluster settings",
+      "Updated search query builder to force prefix queries instead of wildcards"
+    ],
+    "what_did_not_work": "Increasing ES heap size beyond 32GB caused longer Stop-The-World compressed OOPs GC pauses.",
+    "resolved_by": "Sneha Kulkarni",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2172"
+  },
+  {
+    "id": "INC-2195",
+    "title": "Rate limit exceeded on Razorpay payment gateway API",
+    "service": "payments-worker",
+    "severity": "SEV1",
+    "started_at": "2026-08-16T18:00:00Z",
+    "duration_minutes": 20,
+    "alert_text": "HTTP 429 Too Many Requests: Rate limit of 100 req/sec exceeded on /v1/orders\n[ERROR] Razorpay SDK API Client error.",
+    "symptoms": "Checkout page showing 'Payment Gateway Unavailable' during peak Sunday evening sale.",
+    "root_cause": "Retry logic in payments-worker lacked exponential backoff with jitter, leading to thundering herd during minor API glitch.",
+    "resolution_steps": [
+      "Updated payments-worker retry policy to Exponential Backoff with Decorrelated Jitter",
+      "Contacted Razorpay account manager to bump rate limit tier to 300 req/sec"
+    ],
+    "what_did_not_work": "Immediate linear retries flooded API gateway and kept rate limit window open.",
+    "resolved_by": "Arjun Mehta",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2195"
+  },
+  {
+    "id": "INC-2220",
+    "title": "JWT secret key mismatch following deployment",
+    "service": "auth-gateway",
+    "severity": "SEV1",
+    "started_at": "2026-08-25T11:00:00Z",
+    "duration_minutes": 15,
+    "alert_text": "JsonWebTokenError: invalid signature\n[ERROR] auth-gateway rejected 100% of user authentication tokens after release v3.1.0.",
+    "symptoms": "All active logged-in users instantly logged out and unable to re-authenticate.",
+    "root_cause": "Secrets manager sync script omitted trailing newline when updating JWT_SECRET_KEY in production Kubernetes secret.",
+    "resolution_steps": [
+      "Re-synced JWT_SECRET_KEY secret from Vault without formatting truncation",
+      "Restarted auth-gateway pod deployment to pick up corrected environment variable"
+    ],
+    "what_did_not_work": "Rolling back auth-gateway deployment binary did not update the underlying Kubernetes secret.",
+    "resolved_by": "Fatima Sheikh",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2220"
+  },
+  {
+    "id": "INC-2250",
+    "title": "Deadlock in PostgreSQL transaction isolation level on ledger-db",
+    "service": "ledger-db",
+    "severity": "SEV2",
+    "started_at": "2026-09-06T14:30:00Z",
+    "duration_minutes": 35,
+    "alert_text": "ERROR: deadlock detected\nDETAIL: Process 41209 waits for ShareLock on transaction 88102; blocked by process 41215.\n[ERROR] ledger-db lock contention.",
+    "symptoms": "Merchant balance updates failing; database transaction rollback rate spiked to 15%.",
+    "root_cause": "Concurrent ledger updates locked account_balances and ledger_entries tables in reverse order across two payment reconciliation jobs.",
+    "resolution_steps": [
+      "Enforced uniform locking order (account_balances first, then ledger_entries) in ORM model methods",
+      "Added explicit statement_timeout = 5000ms for reconciliation worker connections"
+    ],
+    "what_did_not_work": "Increasing lock timeout caused transactions to pile up and exhaust connection handles.",
+    "resolved_by": "Priya Raman",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2250"
+  },
+  {
+    "id": "INC-2265",
+    "title": "Node.js Event Loop starvation in checkout-api due to sync JSON parsing",
+    "service": "checkout-api",
+    "severity": "SEV2",
+    "started_at": "2026-09-12T16:15:00Z",
+    "duration_minutes": 25,
+    "alert_text": "[ALERT] NodeJSEventLoopDelayHigh: event_loop_delay_ms=4820ms on checkout-api-pod-4. HTTP response time p99 > 8000ms.",
+    "symptoms": "High CPU utilization on checkout-api nodes despite low HTTP request throughput; healthchecks timing out.",
+    "root_cause": "Synchronous JSON schema validation on giant 15MB inventory sync payload blocked Node.js single-threaded event loop.",
+    "resolution_steps": [
+      "Offloaded payload parsing and validation to a dedicated worker_thread",
+      "Added maximum payload size limit (2MB) on incoming HTTP request body"
+    ],
+    "what_did_not_work": "Adding more CPU cores to pod spec did not relieve single-thread blocking execution.",
+    "resolved_by": "Sneha Kulkarni",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2265"
+  },
+  {
+    "id": "INC-2280",
+    "title": "Stale webhooks queue clogging RabbitMQ memory in notifications-svc",
+    "service": "notifications-svc",
+    "severity": "SEV3",
+    "started_at": "2026-09-19T20:00:00Z",
+    "duration_minutes": 30,
+    "alert_text": "[CRITICAL] RabbitMQ high memory watermark reached (85%). Alarm triggered, publishers throttled.",
+    "symptoms": "Webhook notification dispatches stalled; partner merchant integrations missing order status events.",
+    "root_cause": "Dead Letter Exchange (DLX) was missing TTL expiration on unroutable webhook messages, filling queue buffer.",
+    "resolution_steps": [
+      "Purged unroutable messages in DLQ with x-message-ttl set to 86400000ms (24h)",
+      "Set x-max-length policy on webhook retry queue in RabbitMQ manager"
+    ],
+    "what_did_not_work": "Restarting RabbitMQ broker node caused memory dump to disk and delayed startup by 20 minutes.",
+    "resolved_by": "Rohit Das",
+    "postmortem_link": "https://wiki.kirana.internal/incidents/INC-2280"
+  }
+]
