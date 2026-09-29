@@ -87,7 +87,7 @@ export async function runTriageLLM(
   alertText: string,
   recalledMemoriesText?: string
 ): Promise<TriageResult> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = (process.env.GROQ_API_KEY || "").trim();
   if (!apiKey) {
     throw new Error("GROQ_API_KEY environment variable is not configured.");
   }

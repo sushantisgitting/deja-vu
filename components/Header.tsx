@@ -3,37 +3,35 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Database, ShieldAlert, Cpu, Sparkles, Activity } from "lucide-react";
+import { Database, ShieldAlert, Sun, Moon } from "lucide-react";
 
 export function Header() {
   const pathname = usePathname();
-  const [health, setHealth] = useState<{
-    status: string;
-    hindsightReachable: boolean;
-    hasGroqKey: boolean;
-    hasHindsightKey: boolean;
-    error?: string | null;
-  } | null>(null);
-
-  const [memoryCount, setMemoryCount] = useState<number>(18); // Default to seed count
+  const [memoryCount] = useState<number>(18);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
-    async function checkHealth() {
-      try {
-        const res = await fetch("/api/health");
-        if (res.ok) {
-          const data = await res.json();
-          setHealth(data);
-        }
-      } catch {
-        setHealth(null);
-      }
+    // Check saved preference or default to dark
+    const saved = localStorage.getItem("dejavu_theme") as "dark" | "light" | null;
+    if (saved) {
+      setTheme(saved);
+      document.documentElement.classList.remove("light", "dark");
+      document.documentElement.classList.add(saved);
+    } else {
+      document.documentElement.classList.add("dark");
     }
-    checkHealth();
   }, []);
 
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("dejavu_theme", nextTheme);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(nextTheme);
+  };
+
   return (
-    <header className="sticky top-0 z-50 bg-bg/90 backdrop-blur-md border-b border-border">
+    <header className="sticky top-0 z-50 bg-bg/90 backdrop-blur-md border-b border-border transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         {/* Left: Brand logo */}
         <div className="flex items-center space-x-6">
@@ -86,8 +84,8 @@ export function Header() {
           </nav>
         </div>
 
-        {/* Right: Status and Memory Count */}
-        <div className="flex items-center space-x-4">
+        {/* Right: Memory Count & Theme Toggle (Hindsight Ready removed) */}
+        <div className="flex items-center space-x-3">
           {/* Memory Counter */}
           <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-surface border border-border rounded text-xs font-mono">
             <Database className="w-3 h-3 text-accent" />
@@ -95,23 +93,19 @@ export function Header() {
             <span className="text-text font-bold">{memoryCount} INCIDENTS</span>
           </div>
 
-          {/* Health Status Indicator */}
-          <div className="flex items-center space-x-2 px-2.5 py-1 bg-surface border border-border rounded text-xs font-mono">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                health?.status === "healthy"
-                  ? "bg-green animate-pulse-dot"
-                  : health?.hasHindsightKey && health?.hasGroqKey
-                  ? "bg-amber"
-                  : "bg-accent"
-              }`}
-            />
-            <span className="text-muted uppercase text-[10px]">
-              {health?.status === "healthy"
-                ? "HINDSIGHT READY"
-                : health?.error || "SETUP REQUIRED"}
-            </span>
-          </div>
+          {/* Theme Switcher */}
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle Theme"
+            className="p-1.5 bg-surface hover:bg-surface-hover border border-border text-text rounded transition-colors"
+            title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+          >
+            {theme === "dark" ? (
+              <Sun className="w-4 h-4 text-amber" />
+            ) : (
+              <Moon className="w-4 h-4 text-accent" />
+            )}
+          </button>
         </div>
       </div>
     </header>

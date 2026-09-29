@@ -7,9 +7,9 @@ export interface HindsightConfig {
 }
 
 export function getHindsightConfig(): HindsightConfig {
-  const baseUrl = process.env.HINDSIGHT_BASE_URL || "https://api.hindsight.vectorize.io";
-  const apiKey = process.env.HINDSIGHT_API_KEY || "";
-  const bankId = process.env.HINDSIGHT_BANK_ID || "dejavu-oncall";
+  const baseUrl = (process.env.HINDSIGHT_BASE_URL || "https://api.hindsight.vectorize.io").trim();
+  const apiKey = (process.env.HINDSIGHT_API_KEY || "").trim();
+  const bankId = (process.env.HINDSIGHT_BANK_ID || "dejavu-oncall").trim();
 
   return { baseUrl, apiKey, bankId };
 }

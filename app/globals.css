@@ -2,13 +2,34 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-:root {
+:root, html.dark {
   --bg: #0C0C0B;
   --surface: #141413;
+  --surface-hover: #1B1B19;
   --border: #262624;
+  --border-light: #333330;
   --text: #EDEBE6;
   --muted: #8A8883;
   --accent: #FF5B1F;
+  --accent-dim: rgba(255, 91, 31, 0.12);
+  --green: #7BC47F;
+  --amber: #E8B04B;
+  --code-bg: #070706;
+}
+
+html.light {
+  --bg: #F5F4F0;
+  --surface: #FFFFFF;
+  --surface-hover: #EBE8E1;
+  --border: #E0DDD5;
+  --border-light: #C8C5BC;
+  --text: #141413;
+  --muted: #686660;
+  --accent: #E64A0F;
+  --accent-dim: rgba(230, 74, 15, 0.08);
+  --green: #2B8A3E;
+  --amber: #D97706;
+  --code-bg: #EAE7E0;
 }
 
 body {
@@ -17,9 +38,10 @@ body {
   font-family: var(--font-sans), sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Noise overlay */
+/* Futuristic background grain */
 .noise-bg {
   position: fixed;
   top: 0;
@@ -33,9 +55,9 @@ body {
   background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-/* Custom hairline borders */
+/* Hairline dividers */
 .border-hairline {
-  border-color: #262624;
+  border-color: var(--border);
 }
 
 /* Custom scrollbars */
@@ -44,14 +66,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0C0C0B;
+  background: var(--bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #262624;
+  background: var(--border);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #333330;
+  background: var(--border-light);
 }
 
 /* Scanning line animation */
@@ -69,8 +91,8 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #FF5B1F, transparent);
-  box-shadow: 0 0 8px #FF5B1F;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 8px var(--accent);
   animation: scanline 1.8s ease-in-out infinite alternate;
   pointer-events: none;
 }
