@@ -32,10 +32,10 @@ Look at the left pane—*WITHOUT MEMORY*. The generic LLM tells us to restart th
 ---
 
 ### [1:00 - 2:30] LIVE DEMO: HINDSIGHT RECALL & RESOLVE
-**[ON-SCREEN CUE]**: Focus on Right Pane (*WITH HINDSIGHT MEMORY*). Highlight recalled memory cards animating in (`INC-2104`, `INC-2148`), recall latency (~140ms), and verdict badge `SEEN BEFORE`.
+**[ON-SCREEN CUE]**: Focus on Right Pane (*WITH HINDSIGHT MEMORY*). Highlight recalled memory cards animating in (`INC-2104`, `INC-2148`, `INC-2231`), recall latency badge showing **1,644ms**, and verdict badge `SIMILAR — EXACT PATTERN MATCHED`. Show confidence: 90% vs 85% in left pane.
 
 **NARRATOR**:
-"Now look at the right pane—*WITH HINDSIGHT MEMORY*. In 140 milliseconds, Hindsight recalled `INC-2104` and `INC-2148`.
+"Now look at the right pane—*WITH HINDSIGHT MEMORY*. In 1,644 milliseconds, Hindsight searched 100 memory units and recalled `INC-2104`, `INC-2148`, and `INC-2231`.
 
 It nailed the exact root cause: `payments-worker` raised concurrency without adjusting `pgbouncer default_pool_size`. It cites the exact postmortem, tells us to lower concurrency to 16, and specifically warns us *NOT* to restart pods because it failed in prior incidents!
 
