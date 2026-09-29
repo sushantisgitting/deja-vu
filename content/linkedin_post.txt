@@ -5,11 +5,12 @@ I built Déjà Vu, an incident response agent powered by Hindsight agent memory 
 
 Instead of guessing, the agent recalls past root causes and team rules before generating triage.
 
-Key takeaways:
-1. Recall before generate turns generic LLM guesses into grounded, step-by-step triage.
-2. Ingesting 18 postmortems into Hindsight cut triage recall latency down to ~140ms.
-3. Hindsight Reflect identifies recurring failure loops like pgbouncer pool exhaustion.
-4. Storing what *didn't* work prevents engineers from repeating failed fixes.
+Real numbers from live testing:
+- 24/24 memories retained at 100% success rate
+- 1,644ms recall latency searching 100 memory units
+- 90% triage confidence vs 85% without memory (+5pp)
+- 5 systemic failure patterns synthesized by Hindsight Reflect in 16.9 seconds
+- 3 recurring pgbouncer incidents identified and pattern-matched in real time
 
 Check out the full technical article: [ARTICLE_LINK]
 Explore the codebase: [REPO_LINK]
